@@ -1,12 +1,19 @@
--- Minetest 0.4.6 mod: technic_chests
+-- Minetest mod: technic_chests (Standalone version)
 -- namespace: technic
 -- (c) 2012-2013 by RealBadAngel <mk@realbadangel.pl>
 
 local modpath = minetest.get_modpath("technic_chests")
 
-technic = rawget(_G, "technic") or {}
+-- Safely initialize the 'technic' global table. 
+-- If the main technic mod is present, we use it. If not, we create a global fallback
+-- so that sub-files referencing 'technic.chests' won't crash.
+if not _G.technic then
+	_G.technic = {}
+end
+technic = _G.technic
 technic.chests = {}
 
+-- Load the chest sub-modules
 dofile(modpath.."/common.lua")
 dofile(modpath.."/register.lua")
 dofile(modpath.."/iron_chest.lua")
@@ -15,7 +22,7 @@ dofile(modpath.."/silver_chest.lua")
 dofile(modpath.."/gold_chest.lua")
 dofile(modpath.."/mithril_chest.lua")
 
--- undo all of the locked wooden chest recipes created by default and
+-- Undo all of the locked wooden chest recipes created by default and
 -- moreblocks, and just make them use a padlock.
 
 if minetest.get_modpath("moreblocks") then
@@ -72,6 +79,7 @@ minetest.register_craft({
 	}
 })
 
+-- Fixes legacy/wooden chests formspecs
 minetest.register_lbm({
 	name = "technic_chests:fix_wooden_chests",
 	nodenames = {"default:chest"},
