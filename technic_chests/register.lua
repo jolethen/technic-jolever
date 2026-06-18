@@ -84,6 +84,7 @@ local function check_color_buttons(pos, meta, chest_name, fields)
 end
 
 local function set_formspec(pos, data, page)
+	if not data then return end
 	local meta = minetest.get_meta(pos)
 
 	-- Static formspec elements are in base_formspec
@@ -193,7 +194,7 @@ local function get_receive_fields(name, data)
 			meta:set_string("infotext", fields.infotext_box)
 		end
 		if data.color then
-			-- This sets the node
+			-- Maintained "technic:" prefix per your preference
 			local nn = "technic:"..lname..(data.locked and "_locked" or "").."_chest"
 			check_color_buttons(pos, meta, nn, fields)
 		end
@@ -284,6 +285,9 @@ function technic.chests:definition(name, data)
 			tentry = "^pipeworks_tube_connection_stony.png"
 		end
 	end
+	
+	local sound_fallback = (default and default.node_sound_wood_defaults) and default.node_sound_wood_defaults() or nil
+
 	local def = {
 		description = desc,
 		tiles = {
@@ -298,7 +302,7 @@ function technic.chests:definition(name, data)
 		groups = self.groups,
 		tube = self.tube,
 		legacy_facedir_simple = true,
-		sounds = default.node_sound_wood_defaults(),
+		sounds = sound_fallback,
 		after_place_node = locked_after_place,
 		after_dig_node = pipeworks.after_dig,
 
@@ -316,7 +320,9 @@ function technic.chests:definition(name, data)
 		on_metadata_inventory_take = self.on_inv_take,
 		on_blast = function(pos)
 			local drops = {}
-			default.get_inventory_drops(pos, "main", drops)
+			if default and default.get_inventory_drops then
+				default.get_inventory_drops(pos, "main", drops)
+			end
 			drops[#drops+1] = "technic:"..name:lower()..(data.locked and "_locked" or "").."_chest"
 			minetest.remove_node(pos)
 			return drops
@@ -330,17 +336,21 @@ function technic.chests:definition(name, data)
 		def.can_dig = function(pos,player)
 			local meta = minetest.get_meta(pos);
 			local inv = meta:get_inventory()
-			return inv:is_empty("main") and default.can_interact_with_node(player, pos)
+			local baseline_check = inv:is_empty("main")
+			if default and default.can_interact_with_node then
+				return baseline_check and default.can_interact_with_node(player, pos)
+			end
+			return baseline_check
 		end
 		def.on_skeleton_key_use = function(pos, player, newsecret)
 			local meta = minetest.get_meta(pos)
 			local owner = meta:get_string("owner")
-			local name = player:get_player_name()
+			local p_name = player:get_player_name()
 
 			-- verify placer is owner of lockable chest
-			if owner ~= name then
-				minetest.record_protection_violation(pos, name)
-				minetest.chat_send_player(name, "You do not own this chest.")
+			if owner ~= p_name then
+				minetest.record_protection_violation(pos, p_name)
+				minetest.chat_send_player(p_name, "You do not own this chest.")
 				return nil
 			end
 
@@ -428,13 +438,15 @@ end
 
 
 -- Migration of chest formspecs
--- Group is specified in common.lua
+-- NOTE: The prefix of the LBM name MUST match the mod folder name ("technic_chests")
 minetest.register_lbm({
 	label = "technic_chests formspec upgrade",
 	name = "technic_chests:upgrade_formspec",
 	nodenames = {"group:technic_chest"},
 	run_at_every_load = false,
 	action = function(pos, node)
-		set_formspec(pos, registered_chest_data[node.name], "main")
+		if registered_chest_data[node.name] then
+			set_formspec(pos, registered_chest_data[node.name], "main")
+		end
 	end
 })
